@@ -117,6 +117,14 @@ If you need Jira integration you'll need to mount a proper configuration file as
 
 In general the configuration file is the recommended way to go unless you are really forced to use only environment variables.
 
+## How to run with Docker
+
+A Docker image built from the main branch is available at https://hub.docker.com/repository/docker/corneti/todoist-assistant ; no
+releases at the moment other than `latest`, so if you want the latest version
+you'll need to pull from the hub.
+
+To use the image you can simply mount the configuration file at `/config.yaml`.
+
 ## Notes
 
 - The program is currently designed to be stateless, so it will reprocess all tasks on every run.
