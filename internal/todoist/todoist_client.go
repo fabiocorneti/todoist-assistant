@@ -54,6 +54,10 @@ func (tc *TodoistClient) ReplaceTaskLabels(taskID string, labels []string) error
 	return tc.transport.updateTaskLabels(taskID, labels)
 }
 
+func (tc *TodoistClient) SetTaskPriority(taskID string, priority int) error {
+	return tc.transport.setTaskPriority(taskID, priority)
+}
+
 func (tc *TodoistClient) AddLabelsToTask(taskID string, labels []string) error {
 	taskLabels, err := tc.transport.getTaskLabels(taskID)
 	if err != nil {

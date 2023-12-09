@@ -79,13 +79,25 @@ func runProcess() {
 				var task todoist.Task
 				var labelsToAdd []string
 				labelsToAdd = append(labelsToAdd, jiraConfig.Labels...)
+				taskPriority := 1
+				for priority, jiraPriorityNames := range jiraConfig.PriorityMap {
+					for _, name := range jiraPriorityNames {
+						if issue.Fields.Priority.Name == name {
+							taskPriority, err = internal.Configuration.ToAPIPriority(priority)
+							if err != nil {
+								internal.Log.Fatalf(err.Error())
+							}
+							break
+						}
+					}
+				}
 				if jiraConfig.SyncJiraLabels {
 					for _, label := range issue.Fields.Labels {
 						labelsToAdd = append(labelsToAdd, fmt.Sprintf("Jira/Label/%s", label))
 					}
 				}
 				if jiraConfig.SyncJiraComponents {
-					for _, component := range issue.Fields.Component {
+					for _, component := range issue.Fields.Components {
 						labelsToAdd = append(labelsToAdd, fmt.Sprintf("Jira/Component/%s", component.Name))
 					}
 				}
@@ -114,7 +126,16 @@ func runProcess() {
 							break
 						}
 						internal.Log.Infof("Completed task %s", task.Content)
-						continue
+					}
+				}
+
+				internal.Log.Debugf("Task %s priority: %d", task.Content, *task.Priority)
+				if task.Priority != &taskPriority {
+					internal.Log.Debugf("Setting priority to %d for task %s", taskPriority, task.Content)
+					err = todoistClient.SetTaskPriority(task.ID, taskPriority)
+					if err != nil {
+						internal.Log.Fatalf("Error setting priority for task %s: %v", task.Content, err)
+						break
 					}
 				}
 
@@ -144,14 +165,15 @@ func runProcess() {
 				if len(newLabels) > 0 {
 					if internal.HaveSameElements(newLabels, task.Labels) {
 						internal.Log.Debugf("No need to sync Jira labels for task %s", task.Content)
-						continue
-					}
-					err = todoistClient.ReplaceTaskLabels(task.ID, newLabels)
-					if err != nil {
-						internal.Log.Fatalf("Error syncing Jira labels for task %s: %v", task.Content, err)
-						break
+					} else {
+						err = todoistClient.ReplaceTaskLabels(task.ID, newLabels)
+						if err != nil {
+							internal.Log.Fatalf("Error syncing Jira labels for task %s: %v", task.Content, err)
+							break
+						}
 					}
 				}
+
 			}
 			internal.Log.Infof("Finished processing Jira instance %s", jiraConfig.Site)
 		}

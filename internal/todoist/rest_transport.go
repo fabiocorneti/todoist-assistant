@@ -180,6 +180,21 @@ func (t *RESTTodoistTransport) updateTaskLabels(taskID string, labels []string) 
 	return err
 }
 
+func (t *RESTTodoistTransport) setTaskPriority(taskID string, priority int) error {
+	jsonData, err := json.Marshal(map[string]int{"priority": priority})
+	if err != nil {
+		return err
+	}
+
+	req, err := t.newRequest("POST", apiURL+"tasks/"+taskID, strings.NewReader(string(jsonData)))
+	if err != nil {
+		return err
+	}
+
+	_, err = t.httpClient.Do(req)
+	return err
+}
+
 func (t *RESTTodoistTransport) completeTask(taskID string) error {
 	req, err := t.newRequest("POST", apiURL+"tasks/"+taskID+"/close", nil)
 	if err != nil {
