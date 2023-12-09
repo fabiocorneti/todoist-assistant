@@ -2,12 +2,18 @@ package internal
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"strconv"
 
 	"github.com/sirupsen/logrus"
 	"gopkg.in/yaml.v2"
+)
+
+const (
+	p1 = 4
+	p2 = 3
+	p3 = 2
+	p4 = 1
 )
 
 type Config struct {
@@ -21,7 +27,8 @@ type Config struct {
 		ParentProjectName     string `yaml:"parentProjectName"`
 		ProjectsLabelPrefix   string `yaml:"projectsLabelPrefix"`
 	} `yaml:"todoist"`
-	Jira []JiraConfig `yaml:"jira"`
+	Jira   []JiraConfig `yaml:"jira"`
+	loaded bool
 }
 
 type JiraConfig struct {
@@ -38,8 +45,8 @@ type JiraConfig struct {
 }
 
 var (
-	Configuration Config
-	Log           = logrus.New()
+	configuration Config
+	log           = logrus.New()
 )
 
 func (cfg *Config) IsTest() bool {
@@ -68,49 +75,61 @@ func (cfg *Config) validate() {
 func (cfg *Config) ToAPIPriority(configPriority string) (int, error) {
 	switch configPriority {
 	case "p1":
-		return 4, nil
+		return p1, nil
 	case "p2":
-		return 3, nil
+		return p2, nil
 	case "p3":
-		return 2, nil
+		return p3, nil
 	case "p4":
-		return 1, nil
+		return p4, nil
 	default:
 		return 0, fmt.Errorf("unknown priority %s", configPriority)
-
 	}
 }
 
-func init() {
+func GetConfiguration() Config {
+	if !configuration.loaded {
+		loadConfiguration()
+	}
+	return configuration
+}
+
+func GetLogger() *logrus.Logger {
+	return log
+}
+
+func loadConfiguration() {
 	configFile := "config.yaml"
 	if _, err := os.Stat(configFile); err == nil {
-		Configuration, err = readConfig(configFile)
+		configuration, err = readConfig(configFile)
 		if err != nil {
 			log.Fatalf("Error reading config: %v", err)
 		}
 	}
 
-	overrideConfigFromEnv(&Configuration)
+	overrideConfigFromEnv(&configuration)
 
-	setDefaults(&Configuration)
+	setDefaults(&configuration)
 
-	Configuration.validate()
+	configuration.validate()
 
-	if Configuration.LogLevel == "" {
-		Configuration.LogLevel = "error"
+	if configuration.LogLevel == "" {
+		configuration.LogLevel = "error"
 	}
 
-	if Configuration.LogLevel == "info" {
-		Log.SetLevel(logrus.InfoLevel)
-	} else if Configuration.LogLevel == "debug" {
-		Log.SetLevel(logrus.DebugLevel)
-	} else {
-		Log.SetLevel(logrus.ErrorLevel)
+	switch configuration.LogLevel {
+	case "info":
+		log.SetLevel(logrus.InfoLevel)
+	case "debug":
+		log.SetLevel(logrus.DebugLevel)
+	default:
+		log.SetLevel(logrus.ErrorLevel)
 	}
 
-	if Configuration.Todoist.NextActionLabel == "" {
-		Configuration.Todoist.NextActionLabel = "Next Action"
+	if configuration.Todoist.NextActionLabel == "" {
+		configuration.Todoist.NextActionLabel = "Next Action"
 	}
+	configuration.loaded = true
 }
 
 func readConfig(path string) (Config, error) {

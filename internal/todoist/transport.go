@@ -1,7 +1,7 @@
 package todoist
 
-//go:generate mockery --name=TodoistTransport --inpackage --structname=MockTodoistTransport
-type TodoistTransport interface {
+//go:generate mockery --name=Transport --inpackage --structname=MockTransport
+type Transport interface {
 	getProjects() ([]Project, error)
 	getAllTasks() ([]Task, error)
 	getTasksForProject(projectID string) ([]Task, error)

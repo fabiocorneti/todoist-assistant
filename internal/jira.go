@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -39,7 +40,7 @@ func FetchJiraIssues(jiraConfig JiraConfig) ([]JiraIssue, error) {
 
 		requestURL := fmt.Sprintf("%s/rest/api/3/search?jql=%s&startAt=%d&maxResults=%d&fields=%s",
 			jiraConfig.Site, encodedJQL, startAt, maxResults, fields)
-		req, _ := http.NewRequest("GET", requestURL, nil)
+		req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, requestURL, nil)
 		req.SetBasicAuth(jiraConfig.Username, jiraConfig.Token)
 
 		client := &http.Client{}

@@ -2,6 +2,7 @@ package todoist
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,7 +12,8 @@ import (
 )
 
 const (
-	apiURL = "https://api.todoist.com/rest/v2/"
+	apiURL    = "https://api.todoist.com/rest/v2/"
+	tasksPath = "tasks"
 )
 
 type RESTTodoistTransport struct {
@@ -20,7 +22,7 @@ type RESTTodoistTransport struct {
 	testMode   bool
 }
 
-func NewRESTTodoistTransport(token string, testMode bool) TodoistTransport {
+func NewRESTTodoistTransport(token string, testMode bool) Transport {
 	return &RESTTodoistTransport{
 		httpClient: NewRateLimitedClient(),
 		token:      token,
@@ -34,7 +36,7 @@ func (t *RESTTodoistTransport) getProjects() ([]Project, error) {
 		return nil, err
 	}
 
-	resp, err := t.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +52,7 @@ func (t *RESTTodoistTransport) getProjects() ([]Project, error) {
 	}
 
 	var projects []Project
-	if err := json.Unmarshal(body, &projects); err != nil {
+	if err = json.Unmarshal(body, &projects); err != nil {
 		return nil, err
 	}
 
@@ -58,12 +60,12 @@ func (t *RESTTodoistTransport) getProjects() ([]Project, error) {
 }
 
 func (t *RESTTodoistTransport) getTasksForProject(projectID string) ([]Task, error) {
-	req, err := t.newRequest("GET", apiURL+"tasks?project_id="+projectID, nil)
+	req, err := t.newRequest("GET", apiURL+tasksPath+"?project_id="+projectID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := t.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +77,7 @@ func (t *RESTTodoistTransport) getTasksForProject(projectID string) ([]Task, err
 	}
 
 	var tasks []Task
-	if err := json.Unmarshal(body, &tasks); err != nil {
+	if err = json.Unmarshal(body, &tasks); err != nil {
 		return nil, err
 	}
 
@@ -83,12 +85,12 @@ func (t *RESTTodoistTransport) getTasksForProject(projectID string) ([]Task, err
 }
 
 func (t *RESTTodoistTransport) getAllTasks() ([]Task, error) {
-	req, err := t.newRequest("GET", apiURL+"tasks", nil)
+	req, err := t.newRequest("GET", apiURL+tasksPath, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := t.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
 	if err != nil {
 		return nil, err
 	}
@@ -100,7 +102,7 @@ func (t *RESTTodoistTransport) getAllTasks() ([]Task, error) {
 	}
 
 	var tasks []Task
-	if err := json.Unmarshal(body, &tasks); err != nil {
+	if err = json.Unmarshal(body, &tasks); err != nil {
 		return nil, err
 	}
 
@@ -108,12 +110,12 @@ func (t *RESTTodoistTransport) getAllTasks() ([]Task, error) {
 }
 
 func (t *RESTTodoistTransport) getTaskLabels(taskID string) ([]string, error) {
-	req, err := t.newRequest("GET", apiURL+"tasks/"+taskID, nil)
+	req, err := t.newRequest("GET", apiURL+tasksPath+"/"+taskID, nil)
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := t.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
 	if err != nil {
 		return nil, err
 	}
@@ -125,7 +127,7 @@ func (t *RESTTodoistTransport) getTaskLabels(taskID string) ([]string, error) {
 	}
 
 	var task Task
-	if err := json.Unmarshal(body, &task); err != nil {
+	if err = json.Unmarshal(body, &task); err != nil {
 		return nil, err
 	}
 
@@ -146,19 +148,19 @@ func (t *RESTTodoistTransport) createTask(content, projectID string) (*Task, err
 		return nil, err
 	}
 
-	req, err := t.newRequest("POST", apiURL+"tasks", bytes.NewBuffer(jsonTask))
+	req, err := t.newRequest("POST", apiURL+tasksPath, bytes.NewBuffer(jsonTask))
 	if err != nil {
 		return nil, err
 	}
 
-	resp, err := t.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
 
 	var createdTask Task
-	if err := json.NewDecoder(resp.Body).Decode(&createdTask); err != nil {
+	if err = json.NewDecoder(resp.Body).Decode(&createdTask); err != nil {
 		return nil, err
 	}
 
@@ -171,12 +173,17 @@ func (t *RESTTodoistTransport) updateTaskLabels(taskID string, labels []string) 
 		return err
 	}
 
-	req, err := t.newRequest("POST", apiURL+"tasks/"+taskID, strings.NewReader(string(jsonData)))
+	req, err := t.newRequest("POST", apiURL+tasksPath+"/"+taskID, strings.NewReader(string(jsonData)))
 	if err != nil {
 		return err
 	}
 
-	_, err = t.httpClient.Do(req)
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
+	if err != nil {
+		return err
+	}
+
+	defer resp.Body.Close()
 	return err
 }
 
@@ -186,30 +193,40 @@ func (t *RESTTodoistTransport) setTaskPriority(taskID string, priority int) erro
 		return err
 	}
 
-	req, err := t.newRequest("POST", apiURL+"tasks/"+taskID, strings.NewReader(string(jsonData)))
+	req, err := t.newRequest("POST", apiURL+tasksPath+"/"+taskID, strings.NewReader(string(jsonData)))
 	if err != nil {
 		return err
 	}
 
-	_, err = t.httpClient.Do(req)
-	return err
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
+	if err != nil {
+		return err
+	}
+
+	resp.Body.Close()
+	return nil
 }
 
 func (t *RESTTodoistTransport) completeTask(taskID string) error {
-	req, err := t.newRequest("POST", apiURL+"tasks/"+taskID+"/close", nil)
+	req, err := t.newRequest("POST", apiURL+tasksPath+"/"+taskID+"/close", nil)
 	if err != nil {
 		return err
 	}
 
-	_, err = t.httpClient.Do(req)
-	return err
+	resp, err := t.httpClient.Do(req.WithContext(context.TODO()))
+	if err != nil {
+		return err
+	}
+
+	resp.Body.Close()
+	return nil
 }
 
 func (t *RESTTodoistTransport) newRequest(method, url string, body io.Reader) (*http.Request, error) {
 	if t.testMode {
 		log.Fatal("Cannot send requests in test mode")
 	}
-	req, err := http.NewRequest(method, url, body)
+	req, err := http.NewRequestWithContext(context.TODO(), method, url, body)
 	if err != nil {
 		return nil, err
 	}

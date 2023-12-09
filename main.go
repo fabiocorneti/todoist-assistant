@@ -8,70 +8,80 @@ import (
 
 	"github.com/fabiocorneti/todoist-assistant/internal"
 	"github.com/fabiocorneti/todoist-assistant/internal/todoist"
+	"github.com/sirupsen/logrus"
+)
+
+const (
+	jiraMatches = 2
 )
 
 func main() {
-	cfg := internal.Configuration
+	cfg := internal.GetConfiguration()
+	logger := internal.GetLogger()
 
 	ticker := time.NewTicker(time.Duration(cfg.UpdateInterval) * time.Minute)
 	defer ticker.Stop()
 
-	runProcess()
-	internal.Log.Infof("Waiting %d minutes to perform the next update", cfg.UpdateInterval)
+	runProcess(cfg, logger)
+	logger.Infof("Waiting %d minutes to perform the next update", cfg.UpdateInterval)
 	for range ticker.C {
-		runProcess()
-		internal.Log.Infof("Waiting %d minutes to perform the next update", cfg.UpdateInterval)
+		runProcess(cfg, logger)
+		logger.Infof("Waiting %d minutes to perform the next update", cfg.UpdateInterval)
 	}
 }
 
-func runProcess() {
+func runProcess(cfg internal.Config, logger *logrus.Logger) {
+	var err error
 
 	start := time.Now()
 	processedTasks := make(map[string]todoist.Task)
 	regexPattern := `\[([A-Z0-9-]+)\] .+\]\(.+\)$`
 	re := regexp.MustCompile(regexPattern)
 
-	todoistClient := todoist.NewTodoistClient(internal.Configuration.Todoist.Token, internal.Configuration.IsTest())
+	todoistClient := todoist.NewTodoistClient(cfg.Todoist.Token, cfg.IsTest())
 
-	internal.Log.Debug("Getting projects")
+	logger.Debug("Getting projects")
 	projects, err := todoistClient.GetProjects()
 	if err != nil {
-		internal.Log.Fatalf("Error fetching Todoist projects: %v", err)
+		logger.Fatalf("Error fetching Todoist projects: %v", err)
 	}
 
-	if len(internal.Configuration.Jira) > 0 {
-		internal.Log.Info("Fetching Todoist tasks")
-		tasks, err := todoistClient.GetAllTasks()
+	var tasks []todoist.Task
+	var newTask *todoist.Task
+	var jiraIssues []internal.JiraIssue
+	if len(cfg.Jira) > 0 {
+		logger.Info("Fetching Todoist tasks")
+		tasks, err = todoistClient.GetAllTasks()
 		if err != nil {
-			internal.Log.Errorf("Error fetching Todoist tasks: %v", err)
+			logger.Errorf("Error fetching Todoist tasks: %v", err)
 			return
 		}
 
-		internal.Log.Debug("Finding tasks already linked to Jira issues")
+		logger.Debug("Finding tasks already linked to Jira issues")
 		for _, task := range tasks {
 			match := re.FindStringSubmatch(task.Content)
-			if len(match) == 2 {
+			if len(match) == jiraMatches {
 				processedTasks[match[1]] = task
 			}
 		}
-		internal.Log.Debug("Issues already in Todoist:")
+		logger.Debug("Issues already in Todoist:")
 		for key := range processedTasks {
-			internal.Log.Debug(key)
+			logger.Debug(key)
 		}
 
-		for _, jiraConfig := range internal.Configuration.Jira {
+		for _, jiraConfig := range cfg.Jira {
 			var targetProjectID string
 			if jiraConfig.Project != "" {
 				targetProjectID, err = todoistClient.FindProjectID(projects, jiraConfig.Project)
 				if err != nil {
-					internal.Log.Fatalf("An error occurred when finding the target project for instance %s: %v", jiraConfig.Site, err)
+					logger.Fatalf("An error occurred when finding the target project for instance %s: %v", jiraConfig.Site, err)
 				}
 			}
 
-			internal.Log.Infof("Fetching issues from Jira instance %s", jiraConfig.Site)
-			jiraIssues, err := internal.FetchJiraIssues(jiraConfig)
+			logger.Infof("Fetching issues from Jira instance %s", jiraConfig.Site)
+			jiraIssues, err = internal.FetchJiraIssues(jiraConfig)
 			if err != nil {
-				internal.Log.Fatalf("Error fetching Jira issues: %v", err)
+				logger.Fatalf("Error fetching Jira issues: %v", err)
 				continue
 			}
 
@@ -83,9 +93,9 @@ func runProcess() {
 				for priority, jiraPriorityNames := range jiraConfig.PriorityMap {
 					for _, name := range jiraPriorityNames {
 						if issue.Fields.Priority.Name == name {
-							taskPriority, err = internal.Configuration.ToAPIPriority(priority)
+							taskPriority, err = cfg.ToAPIPriority(priority)
 							if err != nil {
-								internal.Log.Fatalf(err.Error())
+								logger.Fatalf(err.Error())
 							}
 							break
 						}
@@ -103,38 +113,37 @@ func runProcess() {
 				}
 				if _, exists := processedTasks[issue.Key]; !exists {
 					if internal.Contains(jiraConfig.CompletionStatuses, issue.Fields.Status.Name) {
-						internal.Log.Debugf("Skipping completed issue [%s] %s", issue.Key, issue.Fields.Summary)
+						logger.Debugf("Skipping completed issue [%s] %s", issue.Key, issue.Fields.Summary)
 						continue
 					}
 					taskContent := internal.FormatTodoistTaskContent(jiraConfig, issue)
-					newTask, err := todoistClient.CreateTask(taskContent, targetProjectID)
+					newTask, err = todoistClient.CreateTask(taskContent, targetProjectID)
 					if err != nil {
-						internal.Log.Fatalf("Error creating Todoist task: %v", err)
+						logger.Fatalf("Error creating Todoist task: %v", err)
 						break
-					} else {
-						internal.Log.Infof("Created Todoist task: %v", taskContent)
 					}
+					logger.Infof("Created Todoist task: %v", taskContent)
 					task = *newTask
 				} else {
 					task = processedTasks[issue.Key]
-					internal.Log.Debugf("Todoist task already exists for Jira issue [%s]", issue.Key)
+					logger.Debugf("Todoist task already exists for Jira issue [%s]", issue.Key)
 					if internal.Contains(jiraConfig.CompletionStatuses, issue.Fields.Status.Name) {
-						internal.Log.Infof("Completing task %s", task.Content)
+						logger.Infof("Completing task %s", task.Content)
 						err = todoistClient.CompleteTask(task.ID)
 						if err != nil {
-							internal.Log.Fatalf("Error completing task %s: %v", task.Content, err)
+							logger.Fatalf("Error completing task %s: %v", task.Content, err)
 							break
 						}
-						internal.Log.Infof("Completed task %s", task.Content)
+						logger.Infof("Completed task %s", task.Content)
 					}
 				}
 
-				internal.Log.Debugf("Task %s priority: %d", task.Content, *task.Priority)
+				logger.Debugf("Task %s priority: %d", task.Content, *task.Priority)
 				if task.Priority != &taskPriority {
-					internal.Log.Debugf("Setting priority to %d for task %s", taskPriority, task.Content)
+					logger.Debugf("Setting priority to %d for task %s", taskPriority, task.Content)
 					err = todoistClient.SetTaskPriority(task.ID, taskPriority)
 					if err != nil {
-						internal.Log.Fatalf("Error setting priority for task %s: %v", task.Content, err)
+						logger.Fatalf("Error setting priority for task %s: %v", task.Content, err)
 						break
 					}
 				}
@@ -164,77 +173,79 @@ func runProcess() {
 
 				if len(newLabels) > 0 {
 					if internal.HaveSameElements(newLabels, task.Labels) {
-						internal.Log.Debugf("No need to sync Jira labels for task %s", task.Content)
+						logger.Debugf("No need to sync Jira labels for task %s", task.Content)
 					} else {
 						err = todoistClient.ReplaceTaskLabels(task.ID, newLabels)
 						if err != nil {
-							internal.Log.Fatalf("Error syncing Jira labels for task %s: %v", task.Content, err)
+							logger.Fatalf("Error syncing Jira labels for task %s: %v", task.Content, err)
 							break
 						}
 					}
 				}
-
 			}
-			internal.Log.Infof("Finished processing Jira instance %s", jiraConfig.Site)
+			logger.Infof("Finished processing Jira instance %s", jiraConfig.Site)
 		}
 	}
 
+	processProjects(*todoistClient, cfg, logger, projects)
+	logger.Infof("Completed update in %f seconds", time.Since(start).Seconds())
+}
+
+func processProjects(todoist todoist.Client, cfg internal.Config, logger *logrus.Logger, projects []todoist.Project) {
+	var err error
 	var parentProjectID string
-	if internal.Configuration.Todoist.ParentProjectName != "" {
-		internal.Log.Debug("Getting parent project")
-		parentProjectID, err = todoistClient.FindProjectID(projects, internal.Configuration.Todoist.ParentProjectName)
+	if cfg.Todoist.ParentProjectName != "" {
+		logger.Debug("Getting parent project")
+		parentProjectID, err = todoist.FindProjectID(projects, cfg.Todoist.ParentProjectName)
 		if err != nil {
-			internal.Log.Fatalf("Error locating parent project: %v", err)
+			logger.Fatalf("Error locating parent project: %v", err)
 		}
 	}
 
-	internal.Log.Info("Processing projects")
+	logger.Info("Processing projects")
 	for _, project := range projects {
 		if parentProjectID != "" && project.ParentID != parentProjectID {
 			continue
 		}
-		internal.Log.Debugf("Getting tasks for project %s (%s)", project.ID, project.Name)
-		tasks, err := todoistClient.GetTasksForProject(project.ID)
+		logger.Debugf("Getting tasks for project %s (%s)", project.ID, project.Name)
+		tasks, err := todoist.GetTasksForProject(project.ID)
 		if err != nil {
-			internal.Log.Fatalf("Error fetching Todoist tasks for project: %v", err)
+			logger.Fatalf("Error fetching Todoist tasks for project: %v", err)
 			break
 		}
-		label := internal.Configuration.Todoist.ProjectsLabelPrefix + "/" + project.Name
+		label := cfg.Todoist.ProjectsLabelPrefix + "/" + project.Name
 		setNextAction := true
 		for _, task := range tasks {
-			if internal.Configuration.Todoist.AssignProjectLabel {
-				internal.Log.Debugf("Processing project task %s", task.Content)
+			if cfg.Todoist.AssignProjectLabel {
+				logger.Debugf("Processing project task %s", task.Content)
 				if !internal.Contains(task.Labels, label) {
-					err = todoistClient.AddLabelsToTask(task.ID, []string{label})
+					err = todoist.AddLabelsToTask(task.ID, []string{label})
 					if err != nil {
-						internal.Log.Fatalf("Error adding project label to task %s", task.Content)
+						logger.Fatalf("Error adding project label to task %s", task.Content)
 						break
 					}
 				}
 			}
-			if internal.Configuration.Todoist.AssignNextActionLabel {
+			if cfg.Todoist.AssignNextActionLabel {
 				// NOTE: do not set next action label on uncompletable tasks
 				if setNextAction && !strings.HasPrefix(task.Content, "* ") {
-					if !internal.Contains(task.Labels, internal.Configuration.Todoist.NextActionLabel) {
-						err = todoistClient.AddLabelsToTask(task.ID, []string{internal.Configuration.Todoist.NextActionLabel})
+					if !internal.Contains(task.Labels, cfg.Todoist.NextActionLabel) {
+						err = todoist.AddLabelsToTask(task.ID, []string{cfg.Todoist.NextActionLabel})
 						if err != nil {
-							internal.Log.Fatalf("Error adding next action label to task %s", task.Content)
+							logger.Fatalf("Error adding next action label to task %s", task.Content)
 							break
 						}
 					}
 					setNextAction = false
-				} else {
-					if internal.Contains(task.Labels, internal.Configuration.Todoist.NextActionLabel) {
-						err = todoistClient.RemoveLabelsFromTask(task.ID, []string{internal.Configuration.Todoist.NextActionLabel})
-						if err != nil {
-							internal.Log.Fatalf("Error removing next action label from task %s: %v", task.Content, err)
-							break
-						}
+				} else if internal.Contains(task.Labels, cfg.Todoist.NextActionLabel) {
+					err = todoist.RemoveLabelsFromTask(task.ID, []string{cfg.Todoist.NextActionLabel})
+					if err != nil {
+						logger.Fatalf("Error removing next action label from task %s: %v", task.Content, err)
+						break
 					}
 				}
 			}
 		}
-		internal.Log.Infof("Completed processing of project %s (%s)", project.ID, project.Name)
+		logger.Infof("Completed processing of project %s (%s)", project.ID, project.Name)
 	}
-	internal.Log.Infof("Completed update in %f seconds", time.Since(start).Seconds())
 }

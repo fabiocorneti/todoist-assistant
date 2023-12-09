@@ -8,7 +8,7 @@ import (
 )
 
 func TestFindProjectId(t *testing.T) {
-	client := TodoistClient{}
+	client := Client{}
 
 	type testCase struct {
 		name           string
@@ -66,8 +66,8 @@ func TestFindProjectId(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			result, err := client.FindProjectID(tc.projects, tc.projectName)
-			assert.Equal(t, err, tc.expectedError)
-			assert.Equal(t, result, tc.expectedResult)
+			assert.Equal(t, tc.expectedError, err)
+			assert.Equal(t, tc.expectedResult, result)
 		})
 	}
 }
