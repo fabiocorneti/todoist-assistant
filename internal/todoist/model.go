@@ -12,6 +12,7 @@ type Task struct {
 	ProjectID string   `json:"project_id,omitempty"`
 	Content   string   `json:"content"`
 	Order     *int     `json:"order,omitempty"`
+	Priority  *int     `json:"priority,omitempty"`
 }
 
 type Label struct {

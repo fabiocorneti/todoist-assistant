@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	fields = "key,summary,status,labels,components"
+	fields = "key,summary,status,labels,components,priority"
 )
 
 type JiraIssue struct {
@@ -19,10 +19,13 @@ type JiraIssue struct {
 		Status  struct {
 			Name string `json:"name"`
 		} `json:"status"`
-		Labels    []string `json:"labels"`
-		Component []struct {
+		Labels     []string `json:"labels"`
+		Components []struct {
 			Name string `json:"name"`
 		} `json:"components"`
+		Priority struct {
+			Name string `json:"name"`
+		} `json:"priority"`
 	} `json:"fields"`
 }
 

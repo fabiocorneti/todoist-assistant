@@ -63,6 +63,7 @@ it can still be used to acquire tasks from Jira.
 - `project`: The name of the project in which new Todoist tasks created from issues will be created. By default they will be created in your Todoist inbox.
 - `syncJiraLabels`: A boolean indicating whether to synchronize labels with Jira. Defaults to `false`.
 - `syncJiraComponents`: A boolean indicating whether to synchronize components with Jira. Defaults to `false`.
+- `priorityMap`: A map between Todoist priorities (p1 to p4) and Jira priority names. Not set by default.
 
 ### Full configuration example
 
@@ -87,6 +88,16 @@ jira:
     completionStatuses:
       - Done
       - REJECTED
+    priorityMap:
+      p1:
+        - "Highest"
+      p2:
+        - "High"
+      p3:
+        - "Medium"
+      p4:
+        - "Low"
+        - "Lowest"
   - site: "https://anotherdomain.atlassian.net"
     username: "spam@smilzo.net"
     token: "YOUR_JIRA_TOKEN"
@@ -98,6 +109,14 @@ jira:
     completionStatuses:
       - Done
       - Rejected
+    priorityMap:
+      p1:
+        - "Highest"
+        - "High"
+      p4:
+        - "Medium"
+        - "Low"
+        - "Lowest"
 ```
 
 #### Environment variable overrides

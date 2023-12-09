@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -24,15 +25,16 @@ type Config struct {
 }
 
 type JiraConfig struct {
-	Site               string   `yaml:"site"`
-	Username           string   `yaml:"username"`
-	Token              string   `yaml:"token"`
-	JQL                string   `yaml:"jql"`
-	Labels             []string `yaml:"labels"`
-	CompletionStatuses []string `yaml:"completionStatuses"`
-	Project            string   `yaml:"project"`
-	SyncJiraLabels     bool     `yaml:"syncJiraLabels"`
-	SyncJiraComponents bool     `yaml:"syncJiraComponents"`
+	Site               string              `yaml:"site"`
+	Username           string              `yaml:"username"`
+	Token              string              `yaml:"token"`
+	JQL                string              `yaml:"jql"`
+	Labels             []string            `yaml:"labels"`
+	CompletionStatuses []string            `yaml:"completionStatuses"`
+	Project            string              `yaml:"project"`
+	SyncJiraLabels     bool                `yaml:"syncJiraLabels"`
+	SyncJiraComponents bool                `yaml:"syncJiraComponents"`
+	PriorityMap        map[string][]string `yaml:"priorityMap"`
 }
 
 var (
@@ -50,6 +52,32 @@ func (cfg *Config) validate() {
 	}
 	if cfg.UpdateInterval <= 0 {
 		log.Fatal("Update interval must be greater than 0")
+	}
+
+	for _, jiraCfg := range cfg.Jira {
+		for key := range jiraCfg.PriorityMap {
+			_, err := cfg.ToAPIPriority(key)
+			if err != nil {
+				log.Fatalf("Invalid key found in PriorityMap: %s. Only p1-p4 are allowed.", key)
+			}
+		}
+	}
+}
+
+// ToAPIPriority converts a configuration priority to a Todoist API priority
+func (cfg *Config) ToAPIPriority(configPriority string) (int, error) {
+	switch configPriority {
+	case "p1":
+		return 4, nil
+	case "p2":
+		return 3, nil
+	case "p3":
+		return 2, nil
+	case "p4":
+		return 1, nil
+	default:
+		return 0, fmt.Errorf("unknown priority %s", configPriority)
+
 	}
 }
 

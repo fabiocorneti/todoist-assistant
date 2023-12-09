@@ -177,6 +177,24 @@ func (_m *MockTodoistTransport) getTasksForProject(projectID string) ([]Task, er
 	return r0, r1
 }
 
+// setTaskPriority provides a mock function with given fields: taskID, priority
+func (_m *MockTodoistTransport) setTaskPriority(taskID string, priority int) error {
+	ret := _m.Called(taskID, priority)
+
+	if len(ret) == 0 {
+		panic("no return value specified for setTaskPriority")
+	}
+
+	var r0 error
+	if rf, ok := ret.Get(0).(func(string, int) error); ok {
+		r0 = rf(taskID, priority)
+	} else {
+		r0 = ret.Error(0)
+	}
+
+	return r0
+}
+
 // updateTaskLabels provides a mock function with given fields: taskID, labels
 func (_m *MockTodoistTransport) updateTaskLabels(taskID string, labels []string) error {
 	ret := _m.Called(taskID, labels)
