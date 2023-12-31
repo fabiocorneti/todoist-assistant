@@ -4,21 +4,21 @@ import (
 	"fmt"
 )
 
-type TodoistClient struct {
-	transport TodoistTransport
+type Client struct {
+	transport Transport
 }
 
-func NewTodoistClient(token string, testMode bool) *TodoistClient {
-	return &TodoistClient{
+func NewTodoistClient(token string, testMode bool) *Client {
+	return &Client{
 		transport: NewRESTTodoistTransport(token, testMode),
 	}
 }
 
-func (tc *TodoistClient) GetProjects() ([]Project, error) {
+func (tc *Client) GetProjects() ([]Project, error) {
 	return tc.transport.getProjects()
 }
 
-func (tc *TodoistClient) FindProjectID(projects []Project, name string) (string, error) {
+func (tc *Client) FindProjectID(projects []Project, name string) (string, error) {
 	var id string
 	for _, p := range projects {
 		if p.Name == name {
@@ -34,31 +34,31 @@ func (tc *TodoistClient) FindProjectID(projects []Project, name string) (string,
 	return id, nil
 }
 
-func (tc *TodoistClient) GetAllTasks() ([]Task, error) {
+func (tc *Client) GetAllTasks() ([]Task, error) {
 	return tc.transport.getAllTasks()
 }
 
-func (tc *TodoistClient) GetTasksForProject(projectID string) ([]Task, error) {
+func (tc *Client) GetTasksForProject(projectID string) ([]Task, error) {
 	return tc.transport.getTasksForProject(projectID)
 }
 
-func (tc *TodoistClient) CreateTask(content, projectID string) (*Task, error) {
+func (tc *Client) CreateTask(content, projectID string) (*Task, error) {
 	return tc.transport.createTask(content, projectID)
 }
 
-func (tc *TodoistClient) CompleteTask(taskID string) error {
+func (tc *Client) CompleteTask(taskID string) error {
 	return tc.transport.completeTask(taskID)
 }
 
-func (tc *TodoistClient) ReplaceTaskLabels(taskID string, labels []string) error {
+func (tc *Client) ReplaceTaskLabels(taskID string, labels []string) error {
 	return tc.transport.updateTaskLabels(taskID, labels)
 }
 
-func (tc *TodoistClient) SetTaskPriority(taskID string, priority int) error {
+func (tc *Client) SetTaskPriority(taskID string, priority int) error {
 	return tc.transport.setTaskPriority(taskID, priority)
 }
 
-func (tc *TodoistClient) AddLabelsToTask(taskID string, labels []string) error {
+func (tc *Client) AddLabelsToTask(taskID string, labels []string) error {
 	taskLabels, err := tc.transport.getTaskLabels(taskID)
 	if err != nil {
 		return err
@@ -72,7 +72,7 @@ func (tc *TodoistClient) AddLabelsToTask(taskID string, labels []string) error {
 	return tc.transport.updateTaskLabels(taskID, taskLabels)
 }
 
-func (tc *TodoistClient) RemoveLabelsFromTask(taskID string, labels []string) error {
+func (tc *Client) RemoveLabelsFromTask(taskID string, labels []string) error {
 	currentLabels, err := tc.transport.getTaskLabels(taskID)
 	if err != nil {
 		return err

@@ -1,18 +1,21 @@
-package internal
+package jira
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+
+	"github.com/fabiocorneti/todoist-assistant/internal/config"
 )
 
 const (
 	fields = "key,summary,status,labels,components,priority"
 )
 
-type JiraIssue struct {
+type Issue struct {
 	Key    string `json:"key"`
 	Fields struct {
 		Summary string `json:"summary"`
@@ -29,8 +32,8 @@ type JiraIssue struct {
 	} `json:"fields"`
 }
 
-func FetchJiraIssues(jiraConfig JiraConfig) ([]JiraIssue, error) {
-	var allIssues []JiraIssue
+func FetchJiraIssues(jiraConfig config.JiraConfig) ([]Issue, error) {
+	var allIssues []Issue
 	startAt := 0
 	maxResults := 50
 
@@ -39,7 +42,7 @@ func FetchJiraIssues(jiraConfig JiraConfig) ([]JiraIssue, error) {
 
 		requestURL := fmt.Sprintf("%s/rest/api/3/search?jql=%s&startAt=%d&maxResults=%d&fields=%s",
 			jiraConfig.Site, encodedJQL, startAt, maxResults, fields)
-		req, _ := http.NewRequest("GET", requestURL, nil)
+		req, _ := http.NewRequestWithContext(context.TODO(), http.MethodGet, requestURL, nil)
 		req.SetBasicAuth(jiraConfig.Username, jiraConfig.Token)
 
 		client := &http.Client{}
@@ -57,10 +60,10 @@ func FetchJiraIssues(jiraConfig JiraConfig) ([]JiraIssue, error) {
 			return nil, err
 		}
 		var response struct {
-			Issues     []JiraIssue `json:"issues"`
-			Total      int         `json:"total"`
-			MaxResults int         `json:"maxResults"`
-			StartAt    int         `json:"startAt"`
+			Issues     []Issue `json:"issues"`
+			Total      int     `json:"total"`
+			MaxResults int     `json:"maxResults"`
+			StartAt    int     `json:"startAt"`
 		}
 		err = json.Unmarshal(body, &response)
 		if err != nil {
