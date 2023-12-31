@@ -1,6 +1,11 @@
-package internal
+package utils
 
-import "fmt"
+import (
+	"fmt"
+
+	"github.com/fabiocorneti/todoist-assistant/internal/config"
+	"github.com/fabiocorneti/todoist-assistant/internal/jira"
+)
 
 func Contains(slice []string, str string) bool {
 	for _, v := range slice {
@@ -33,7 +38,7 @@ func HaveSameElements(slice1, slice2 []string) bool {
 	return true
 }
 
-func FormatTodoistTaskContent(jiraConfig JiraConfig, issue JiraIssue) string {
+func FormatTodoistTaskContent(jiraConfig config.JiraConfig, issue jira.Issue) string {
 	issueURL := fmt.Sprintf("%s/browse/%s", jiraConfig.Site, issue.Key)
 	taskContent := fmt.Sprintf("[[%s] %s](%s)", issue.Key, issue.Fields.Summary, issueURL)
 	return taskContent
